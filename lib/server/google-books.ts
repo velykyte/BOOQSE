@@ -45,8 +45,26 @@ export async function searchGoogleBooksVolumes(
 
   const res = await fetch(url.toString(), { cache: "no-store" });
   if (!res.ok) {
-    // Include status only; never include API keys or response bodies.
-    throw new Error(`Google Books request failed (${res.status} ${res.statusText})`);
+    // Include status + safe error message; never include API keys.
+    let googleMessage: string | null = null;
+    try {
+      const body = (await res.json()) as unknown as {
+        error?: { message?: string; errors?: Array<{ reason?: string; message?: string }> };
+      };
+      googleMessage = body?.error?.message ?? null;
+      const reason = body?.error?.errors?.[0]?.reason ?? null;
+      if (reason && !googleMessage?.includes(reason)) {
+        googleMessage = googleMessage ? `${googleMessage} (${reason})` : `(${reason})`;
+      }
+    } catch {
+      // Ignore JSON parse errors; we'll still throw status-based error below.
+    }
+
+    throw new Error(
+      googleMessage
+        ? `Google Books request failed (${res.status} ${res.statusText}): ${googleMessage}`
+        : `Google Books request failed (${res.status} ${res.statusText})`,
+    );
   }
 
   const data = (await res.json()) as GoogleVolumesResponse;
