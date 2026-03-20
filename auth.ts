@@ -35,7 +35,11 @@ export const authOptions: NextAuthOptions = {
         // If InstantDB bootstrapping fails, we want NextAuth to land on `/auth/error`
         // instead of leaving the session unset (which triggers the `/auth` redirect loop).
         console.error("[nextauth] bootstrapInstantUser failed during sign-in", err);
-        return false;
+
+        const message =
+          err instanceof Error ? err.message : "InstantDB bootstrap failed";
+
+        return `/auth/error?error=${encodeURIComponent(message)}`;
       }
     },
   },

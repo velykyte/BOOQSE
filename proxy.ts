@@ -11,6 +11,18 @@ export async function proxy(req: NextRequest) {
   const token = await getToken({ req, secret });
   const isAuthenticated = Boolean(token);
 
+  // Debug auth redirect loops on Vercel without leaking secrets.
+  // This only logs for the most common post-login landing routes.
+  if (pathname === "/" || pathname.startsWith("/profile") || pathname.startsWith("/stats")) {
+    console.error("[proxy] auth check", {
+      pathname,
+      isPublicPath,
+      hasSecret: Boolean(secret),
+      secretLen: secret?.length ?? 0,
+      tokenPresent: isAuthenticated,
+    });
+  }
+
   if (!isAuthenticated && !isPublicPath) {
     return NextResponse.redirect(new URL("/auth", req.url));
   }
