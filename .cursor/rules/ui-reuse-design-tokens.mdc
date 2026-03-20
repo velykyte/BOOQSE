@@ -1,0 +1,37 @@
+---
+description: Reuse existing UI components, tokens, colors, and typography; avoid one-off styling
+globs: "**/*.{tsx,jsx,vue,css,scss}"
+alwaysApply: false
+---
+
+# UI reuse and design tokens
+
+Visual work must stay consistent with **what already exists in the codebase** and with **`docs/FRONTEND.md`** (colors, typography, components). Do not invent parallel systems.
+
+## Before adding anything new
+
+1. **Search** for existing components, layout primitives, and shared styles (e.g. `components/`, `ui/`, theme files, CSS variables, Tailwind config).
+2. **Prefer composition**: extend or wrap an existing component instead of duplicating markup and styles.
+3. **Tokens first**: use named tokens, theme values, or documented palette/typography from `docs/FRONTEND.md`—not arbitrary hex/RGB or ad-hoc font stacks.
+
+## When something seems missing
+
+- **Necessary** means: no reasonable existing primitive or token can express the requirement without breaking the design system.
+- Prefer the **smallest** change: add one token or one variant to an existing component, not a new standalone pattern.
+- If the product doc does not cover a new visual need, **propose updating `docs/FRONTEND.md`** (or the project’s token source) instead of silently diverging.
+
+```tsx
+// ❌ BAD — one-off styling, ignores shared Button and palette
+<button style={{ background: "#ff00aa", fontFamily: "Comic Sans MS" }}>Save</button>
+
+// ✅ GOOD — existing component + tokens / theme
+<Button variant="primary">Save</Button>
+```
+
+```css
+/* ❌ BAD — magic values alongside an existing token system */
+.card { color: #333333; border: 1px solid #cccccc; }
+
+/* ✅ GOOD — semantic token / variable already used in the project */
+.card { color: var(--color-text-primary); border: 1px solid var(--color-border); }
+```

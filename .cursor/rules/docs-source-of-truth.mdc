@@ -1,0 +1,29 @@
+---
+description: Treat /docs as the authoritative source for product and technical decisions
+alwaysApply: true
+---
+
+# Documentation as source of truth
+
+Before designing, implementing, or changing behavior, align with the project docs in `docs/`. If code, assumptions, or chat conflict with those files, **follow the docs** (or propose updating the docs first—do not silently diverge).
+
+| Doc | Use it for |
+|-----|------------|
+| `docs/PRD.md` | Product goals, scope, requirements |
+| `docs/FLOW.md` | User flows and process |
+| `docs/SCHEMA.md` | Data model and persistence |
+| `docs/BACKEND.md` | API, services, server-side behavior |
+| `docs/FRONTEND.md` | UI structure, client behavior |
+| `docs/SECURITY.md` | Auth, secrets, safety constraints |
+
+**Workflow**
+
+1. For any non-trivial task, open or skim the relevant doc(s) above before writing code.
+2. Prefer quoting or paraphrasing doc requirements in plans so decisions are traceable.
+3. If a doc is missing or ambiguous, state the gap and choose the smallest reasonable interpretation—do not invent major product behavior without doc alignment.
+
+This rule works together with the MVP rule: stay within MVP **and** implement what MVP allows **as specified in `docs/`**.
+
+```markdown
+Example: PRD says “email optional” but a form makes email required → match PRD (or flag doc update).
+```

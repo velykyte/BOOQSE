@@ -1,0 +1,15 @@
+---
+description: Finish one coherent task before starting the next; pause between steps
+alwaysApply: true
+---
+
+# One task at a time
+
+- **Complete** one coherent task end-to-end (implement, verify, summarize) before moving on.
+- **Pause** after that task: do not chain into the next feature, refactor, or optional improvement in the same turn unless the user asked for a batch.
+- If the user’s message implies multiple unrelated items, **treat the first as the active task** and confirm before starting the rest.
+
+```markdown
+Example: User asks for “add login + dark mode + tests.”
+→ Ship login fully, report status, then wait for go-ahead (or explicit “continue”) before dark mode.
+```

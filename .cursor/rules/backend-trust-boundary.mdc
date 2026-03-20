@@ -1,0 +1,56 @@
+---
+description: Enforce auth, ownership, validation, privacy, and rate limits on the server—never trust the client for security
+alwaysApply: true
+---
+
+# Backend trust boundary
+
+Align with `docs/SECURITY.md` (Core Principles, Authentication, Authorization & Ownership, Privacy, Input Validation, API Security, Rate Limiting) and `docs/BACKEND.md`.
+
+**Frontend improves UX; the backend enforces security.** Client-side checks are optional hints only—they are not authorization, validation, privacy, or abuse control.
+
+## Enforce on the server
+
+| Concern | Backend must |
+|--------|----------------|
+| **Authentication** | Verify session/token on every protected request; never trust a client-supplied `userId` as proof of identity. |
+| **Ownership (IDOR)** | Resolve the actor from the session, then scope reads/writes by that user (or explicit public rules). Resource IDs from the client never grant access by themselves. |
+| **Input validation** | Validate and constrain bodies/params (types, ranges, allowed enums, dates). Reject invalid input before persistence. |
+| **Privacy** | Filter responses and queries so private data (e.g. reflections, hidden fields) never leaks through “convenient” APIs. |
+| **Rate limiting** | Apply limits server-side (per user/IP as in docs); clients cannot bypass them. |
+
+## Quick checks
+
+- [ ] Handler assumes **no** trust in client identity or “already validated” payloads.
+- [ ] Mutations check **ownership** (or documented public behavior) in the same layer that talks to the DB.
+- [ ] Responses include only **least data** needed; errors are safe (no secrets, no stack traces to clients).
+
+## Examples
+
+```typescript
+// ❌ BAD — identity and access from the body
+export async function POST(req: Request) {
+  const { userId, bookId } = await req.json();
+  await db.books.update(bookId, { ... }); // anyone could pass another userId/bookId
+}
+
+// ✅ GOOD — identity from verified session; access via ownership
+export async function POST(req: Request) {
+  const session = await getSession(req);
+  if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const body = parseAndValidateBookUpdate(await req.json()); // server schema
+  const book = await db.books.findFirst({ id: body.bookId, userId: session.userId });
+  if (!book) return Response.json({ error: "Not found" }, { status: 404 });
+  await db.books.update(book.id, body.patch);
+}
+```
+
+```typescript
+// ❌ BAD — “we already validated in React”
+if (pagesRead >= 1 && pagesRead <= 1000) save(pagesRead); // only in browser
+
+// ✅ GOOD — same rules enforced in the API / server action
+const pagesRead = bookUpdateSchema.parse(body).pagesRead; // reject if out of range
+```
+
+See also: `client-secrets-server-only.mdc` for keys and credentials.

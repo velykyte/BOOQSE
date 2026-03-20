@@ -1,0 +1,26 @@
+---
+description: When unclear, state assumptions; do not invent undefined behavior
+alwaysApply: true
+---
+
+# Explicit assumptions; no invented behavior
+
+When requirements, docs, or existing code leave behavior undefined:
+
+1. **State assumptions up front** — Before designing or implementing, list what you are assuming (bullet list is fine) so the user can correct you.
+2. **Do not invent product or technical behavior** — Do not add features, business rules, API shapes, validation rules, edge-case handling, or UX flows that were not specified or clearly implied by authoritative sources (e.g. `docs/`, explicit user instructions, or existing patterns in the codebase for the same concern).
+3. **Prefer the smallest safe step** — If something is ambiguous, implement the minimal interpretation, flag the gap, or ask; do not “fill in” with creative logic to make the app feel complete.
+
+This works with **Documentation as source of truth**: if `docs/` are silent or vague, say so and either propose a doc change or state the smallest interpretation — do not treat guesses as facts.
+
+```markdown
+❌ BAD: User says “add sorting” with no field/direction → implement multi-column sort with persisted preferences.
+
+✅ GOOD: “Assuming: sort by `createdAt` descending (newest first). Say if you want a different field or asc order.” Then implement only that.
+```
+
+```markdown
+❌ BAD: API response shape unspecified → invent extra fields and client types for “future use.”
+
+✅ GOOD: Match existing handlers/types in the repo; if none exist, mirror the doc or ask for one example payload.
+```
