@@ -8,7 +8,16 @@ export async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
   const secret = process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET;
-  const token = await getToken({ req, secret });
+
+  // NextAuth uses different cookie names depending on whether it thinks cookies
+  // should be "secure" (HTTPS). On Vercel, this can mismatch if `NEXTAUTH_URL`
+  // is missing or has the wrong scheme, causing getToken() to always return null.
+  const COOKIE_SECURE = "__Secure-next-auth.session-token";
+  const COOKIE_UNSECURE = "next-auth.session-token";
+  const hasSecureCookie = Boolean(req.cookies.get(COOKIE_SECURE)?.value);
+  const cookieName = hasSecureCookie ? COOKIE_SECURE : COOKIE_UNSECURE;
+
+  const token = await getToken({ req, secret, cookieName });
   const isAuthenticated = Boolean(token);
 
   // Debug auth redirect loops on Vercel without leaking secrets.
@@ -24,6 +33,7 @@ export async function proxy(req: NextRequest) {
   }
 
   if (!isAuthenticated && !isPublicPath) {
+    console.error("[proxy] redirecting to /auth", { pathname, cookieName, tokenPresent: isAuthenticated });
     return NextResponse.redirect(new URL("/auth", req.url));
   }
 
