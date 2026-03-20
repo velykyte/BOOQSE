@@ -25,12 +25,18 @@ export const authOptions: NextAuthOptions = {
         user.email.split("@")[0] ||
         "Reader";
 
-      await bootstrapInstantUser({
-        email: user.email,
-        name,
-      });
-
-      return true;
+      try {
+        await bootstrapInstantUser({
+          email: user.email,
+          name,
+        });
+        return true;
+      } catch (err) {
+        // If InstantDB bootstrapping fails, we want NextAuth to land on `/auth/error`
+        // instead of leaving the session unset (which triggers the `/auth` redirect loop).
+        console.error("[nextauth] bootstrapInstantUser failed during sign-in", err);
+        return false;
+      }
     },
   },
 };
