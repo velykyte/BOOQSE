@@ -3,6 +3,10 @@ import { getStatsPageView } from "@/lib/server/stats";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import asset3 from "@/ASSETS/Asset 3.webp";
+import { unstable_noStore as noStore } from "next/cache";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function LineChart({
   title,
@@ -10,12 +14,16 @@ function LineChart({
   points,
   stroke,
   valueDecimals,
+  showChart = true,
+  valueClassName,
 }: {
   title: string;
   unit: string;
   points: Array<{ label: string; value: number }>;
   stroke: string;
   valueDecimals?: number;
+  showChart?: boolean;
+  valueClassName?: string;
 }) {
   const w = 520;
   const h = 190;
@@ -57,16 +65,36 @@ function LineChart({
     return `${Math.round(v)}`;
   };
 
+  const chartEnabled = showChart !== false;
+
   return (
-    <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-5 md:p-6">
-      <div className="flex items-end justify-between gap-4">
+    <section
+      className={[
+        "flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-5 md:p-6",
+        chartEnabled ? "" : "items-center justify-center",
+      ].join(" ")}
+    >
+      <div
+        className={
+          chartEnabled
+            ? "flex w-full items-end justify-between gap-4"
+            : "flex w-full flex-col items-center justify-center gap-3 text-center"
+        }
+      >
         <div>
           <p className="text-sm text-[var(--text-secondary)]">{title}</p>
-          <p className="mt-1 font-serif text-2xl leading-tight">
+          <p
+            className={
+              valueClassName ??
+              (chartEnabled
+                ? "mt-1 font-serif text-2xl leading-tight"
+                : "mt-2 font-serif text-7xl leading-none md:text-8xl")
+            }
+          >
             {last ? `${formatValue(last.value)}${unit}` : "—"}
           </p>
         </div>
-        {n > 0 ? (
+        {chartEnabled && n > 0 ? (
           <div className="text-right">
             <p className="text-xs text-[var(--text-secondary)]">{points[0]?.label}</p>
             <p className="text-xs text-[var(--text-secondary)]">{points[n - 1]?.label}</p>
@@ -74,46 +102,65 @@ function LineChart({
         ) : null}
       </div>
 
-      {n === 0 ? (
-        <p className="mt-4 text-sm text-[var(--text-secondary)]">No data yet.</p>
-      ) : (
-        <svg
-          className="mt-4 w-full"
-          viewBox={`0 0 ${w} ${h}`}
-          role="img"
-          aria-label={`${title} line chart`}
-        >
-          {/* Background grid */}
-          {[0, 1, 2, 3].map((i) => {
-            const y = padY + i * ((h - padY * 2) / 3);
-            return (
-              <line
-                key={i}
-                x1={padX}
-                y1={y}
-                x2={w - padX}
-                y2={y}
-                stroke="var(--border-subtle)"
-                strokeOpacity={0.4}
+      {chartEnabled ? (
+        n === 0 ? (
+          <p className="mt-4 text-sm text-[var(--text-secondary)]">No data yet.</p>
+        ) : (
+          <div className="mt-4 flex-1 min-h-0">
+            <svg
+              className="h-full w-full"
+              preserveAspectRatio="xMidYMid meet"
+              viewBox={`0 0 ${w} ${h}`}
+              role="img"
+              aria-label={`${title} line chart`}
+            >
+              {/* Background grid */}
+              {[0, 1, 2, 3].map((i) => {
+                const y = padY + i * ((h - padY * 2) / 3);
+                return (
+                  <line
+                    key={i}
+                    x1={padX}
+                    y1={y}
+                    x2={w - padX}
+                    y2={y}
+                    stroke="var(--border-subtle)"
+                    strokeOpacity={0.4}
+                  />
+                );
+              })}
+
+              {/* Line */}
+              <path
+                d={d}
+                fill="none"
+                stroke={stroke}
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
-            );
-          })}
 
-          {/* Line */}
-          <path d={d} fill="none" stroke={stroke} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-
-          {/* Points */}
-          {points.map((p, i) => {
-            const x = xAt(i);
-            const y = yAt(p.value);
-            return (
-              <g key={p.label + i}>
-                <circle cx={x} cy={y} r={5} fill="var(--surface)" stroke={stroke} strokeWidth={3} />
-              </g>
-            );
-          })}
-        </svg>
-      )}
+              {/* Points */}
+              {points.map((p, i) => {
+                const x = xAt(i);
+                const y = yAt(p.value);
+                return (
+                  <g key={p.label + i}>
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={5}
+                      fill="var(--surface)"
+                      stroke={stroke}
+                      strokeWidth={3}
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+        )
+      ) : null}
     </section>
   );
 }
@@ -129,11 +176,13 @@ function PieChart({
   points: Array<{ label: string; value: number }>;
   valueDecimals?: number;
 }) {
-  const w = 200;
-  const h = 200;
+  // Slightly smaller than the line-chart cards' internal width
+  // so it looks cohesive inside the `lg:grid-cols-3` layout.
+  const w = 180;
+  const h = 180;
   const cx = w / 2;
   const cy = h / 2;
-  const r = 85;
+  const r = 75;
 
   const safePoints = points.filter((p) => Number.isFinite(p.value) && p.value > 0);
   const total = safePoints.reduce((acc, p) => acc + p.value, 0);
@@ -173,7 +222,7 @@ function PieChart({
   ];
 
   return (
-    <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-5 md:p-6">
+    <section className="flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-5 md:p-6">
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-sm text-[var(--text-secondary)]">{title}</p>
@@ -192,29 +241,36 @@ function PieChart({
         <p className="mt-4 text-sm text-[var(--text-secondary)]">No data yet.</p>
       ) : (
         <>
-          <svg
-            className="mt-4 w-full"
-            viewBox={`0 0 ${w} ${h}`}
-            role="img"
-            aria-label={`${title} pie chart`}
-          >
-            {safePoints.map((p, idx) => {
-              const fraction = total === 0 ? 0 : p.value / total;
-              // Start at top (-90deg) for a consistent “12 o'clock” start.
-              const startAngle = -90 + safePoints.slice(0, idx).reduce((acc, x) => acc + (x.value / total) * 360, 0);
-              const endAngle = startAngle + fraction * 360;
-              const fill = palette[idx % palette.length];
-              return (
-                <path
-                  key={p.label + idx}
-                  d={describeSlicePath(startAngle, endAngle)}
-                  fill={fill}
-                  stroke="var(--surface)"
-                  strokeWidth={2}
-                />
-              );
-            })}
-          </svg>
+          <div className="mt-4 flex-1 min-h-0">
+            <svg
+              className="h-full w-full"
+              preserveAspectRatio="xMidYMid slice"
+              viewBox={`0 0 ${w} ${h}`}
+              role="img"
+              aria-label={`${title} pie chart`}
+            >
+              {safePoints.map((p, idx) => {
+                const fraction = total === 0 ? 0 : p.value / total;
+                // Start at top (-90deg) for a consistent “12 o'clock” start.
+                const startAngle =
+                  -90 +
+                  safePoints
+                    .slice(0, idx)
+                    .reduce((acc, x) => acc + (x.value / total) * 360, 0);
+                const endAngle = startAngle + fraction * 360;
+                const fill = palette[idx % palette.length];
+                return (
+                  <path
+                    key={p.label + idx}
+                    d={describeSlicePath(startAngle, endAngle)}
+                    fill={fill}
+                    stroke="var(--surface)"
+                    strokeWidth={2}
+                  />
+                );
+              })}
+            </svg>
+          </div>
 
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
             {safePoints.slice(0, 4).map((p, idx) => {
@@ -247,6 +303,9 @@ export default async function StatsPage() {
     redirect("/auth");
   }
 
+  // Ensure fresh chart data after new sessions are logged.
+  noStore();
+
   const view = await getStatsPageView(auth.user.id);
 
   return (
@@ -260,6 +319,7 @@ export default async function StatsPage() {
             </h1>
             <p className="mt-4 break-words text-base text-[var(--text-secondary)]">
               Pages per day, time per day, and reading speed — powered by your logged sessions.
+              Tracking keeps your progress visible, and that momentum is what helps you stay motivated.
             </p>
           </div>
           <div className="flex justify-end md:flex-shrink-0">
@@ -274,9 +334,40 @@ export default async function StatsPage() {
       </section>
 
       <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-6 md:p-8">
-        <div className="flex items-end justify-between gap-4">
-          <h2 className="font-serif text-2xl leading-tight">Streak</h2>
-          <p className="text-sm text-[var(--text-secondary)]">{view.streakDays} day(s)</p>
+        <div className="flex w-full items-center justify-between gap-4">
+          <div className="flex items-baseline gap-3">
+            <h2 className="font-serif text-2xl leading-tight">Streak</h2>
+            <p className="font-serif text-4xl leading-none text-[var(--brand-burgundy)]">{view.streakDays}</p>
+            <p className="text-sm text-[var(--text-secondary)]">day(s)</p>
+          </div>
+
+          <div className="flex max-w-[50%] flex-1 items-center justify-end gap-1 overflow-hidden">
+            {view.streakCalendarDays.map((d) => (
+              <div
+                key={d.ymd}
+                className="flex flex-1 flex-col items-center justify-center gap-1"
+              >
+                <span
+                  className={
+                    d.isRead
+                      ? "text-xs leading-none text-[var(--brand-blue)]"
+                      : "text-xs leading-none text-[var(--text-secondary)]"
+                  }
+                >
+                  {d.weekdayLetter}
+                </span>
+                <span
+                  className={
+                    d.isRead
+                      ? "font-serif text-[var(--brand-blue)]"
+                      : "font-serif text-[var(--text-secondary)]"
+                  }
+                >
+                  {d.day}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -293,11 +384,12 @@ export default async function StatsPage() {
           points={view.timePerDay.map((p) => ({ label: p.label, value: p.value }))}
         />
         <LineChart
-          title="Avg speed"
-          unit="/h"
+          title="Pages per hour"
+          unit=""
           points={view.avgSpeedPerDay.map((p) => ({ label: p.label, value: p.value }))}
           valueDecimals={1}
           stroke="var(--brand-blue)"
+          showChart={false}
         />
       </div>
     </main>

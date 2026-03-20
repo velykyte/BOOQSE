@@ -86,12 +86,12 @@ export function LogSessionForm({
               <img
                 src={selectedBook.thumbnailUrl}
                 alt=""
-                className="h-16 w-11 shrink-0 rounded object-cover"
-                width={44}
-                height={64}
+                className="h-[96px] w-[66px] shrink-0 rounded object-cover"
+                width={66}
+                height={96}
               />
             ) : (
-              <div className="flex h-16 w-11 shrink-0 items-center justify-center rounded bg-[var(--surface-subtle)] text-[10px] text-[var(--text-secondary)]">
+              <div className="flex h-[96px] w-[66px] shrink-0 items-center justify-center rounded bg-[var(--surface-subtle)] text-[10px] text-[var(--text-secondary)]">
                 —
               </div>
             )}
@@ -120,12 +120,12 @@ export function LogSessionForm({
                   <img
                     src={b.thumbnailUrl}
                     alt=""
-                    className="h-16 w-11 shrink-0 rounded object-cover"
-                    width={44}
-                    height={64}
+                    className="h-[96px] w-[66px] shrink-0 rounded object-cover"
+                    width={66}
+                    height={96}
                   />
                 ) : (
-                  <div className="flex h-16 w-11 shrink-0 items-center justify-center rounded bg-[var(--surface-subtle)] text-[10px] text-[var(--text-secondary)]">
+                  <div className="flex h-[96px] w-[66px] shrink-0 items-center justify-center rounded bg-[var(--surface-subtle)] text-[10px] text-[var(--text-secondary)]">
                     —
                   </div>
                 )}
@@ -179,7 +179,7 @@ export function LogSessionForm({
           required
           value={pagesRead}
           onChange={(e) => setPagesRead(e.target.value)}
-          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 text-base outline-none"
         />
       </div>
 
@@ -198,7 +198,7 @@ export function LogSessionForm({
           required
           value={timeMinutes}
           onChange={(e) => setTimeMinutes(e.target.value)}
-          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 text-base outline-none"
         />
       </div>
 

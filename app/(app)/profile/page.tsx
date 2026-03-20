@@ -7,8 +7,14 @@ import Link from "next/link";
 import { RemoveUserBookButton } from "@/components/profile/remove-user-book-button";
 import Image from "next/image";
 import asset2 from "@/ASSETS/Asset 2.webp";
+import { unstable_noStore as noStore } from "next/cache";
+import { listReadingSessionsForUserBook } from "@/lib/server/reading-sessions-read";
 
 export default async function ProfilePage() {
+  // Ensure `/profile` always reflects the latest InstantDB writes
+  // (taste profile + recommendation history) instead of serving cached HTML.
+  noStore();
+
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   const appUser = email ? await getAppUserByEmail(email) : null;
@@ -35,6 +41,61 @@ export default async function ProfilePage() {
 
   const db = getInstantAdminDb();
   const explanationByGoogleId = new Map<string, string>();
+
+  // Used to render the progress bars on each shelf card.
+  const pagesReadByUserBookId = new Map<string, number>();
+  await Promise.all(
+    libraryBooks.map(async (b) => {
+      try {
+        const sessions = await listReadingSessionsForUserBook(appUser.id, b.userBookId);
+        const totalPagesRead = sessions.reduce((acc, s) => acc + (Number.isFinite(s.pagesRead) ? s.pagesRead : 0), 0);
+        pagesReadByUserBookId.set(b.userBookId, totalPagesRead);
+      } catch {
+        pagesReadByUserBookId.set(b.userBookId, 0);
+      }
+    }),
+  );
+
+  function progressRatio(b: (typeof libraryBooks)[number]): number {
+    if (b.status === "want_to_read") return 0;
+    if (b.status === "currently_reading") {
+      const total = b.userDefinedTotalPages;
+      if (!Number.isFinite(total) || !total || total <= 0) return 0;
+      const read = pagesReadByUserBookId.get(b.userBookId) ?? 0;
+      return Math.max(0, Math.min(1, read / total));
+    }
+    // Past reads and finished books should always show fully read.
+    return 1;
+  }
+
+  function formatAuthor(author: string | null): string | null {
+    if (!author) return null;
+    const parts = author
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length <= 1) return author;
+    return `${parts[0]}...`;
+  }
+
+  function ProgressBar({
+    ratio,
+    variant,
+  }: {
+    ratio: number;
+    variant: "grey" | "primary";
+  }) {
+    const percent = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+    const fillBg =
+      variant === "grey" ? "bg-[var(--text-secondary)]" : "bg-[var(--brand-burgundy)]";
+    return (
+      <div className="flex w-full items-center justify-center">
+        <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
+          <div className={`h-full ${fillBg}`} style={{ width: `${percent}%` }} />
+        </div>
+      </div>
+    );
+  }
 
   const coerceTasteSummary = (value: unknown): string | null => {
     if (value == null) return null;
@@ -115,6 +176,20 @@ export default async function ProfilePage() {
     hydratedTasteProfileUpdatedAtLabel = hydratedTasteProfileUpdatedAtLabel ?? bestUpdatedAtLabel;
   }
 
+  const tasteGenresMarker = "\n\nGenres:";
+  const tasteGenresSplit =
+    hydratedTasteProfileSummary && hydratedTasteProfileSummary.includes(tasteGenresMarker)
+      ? hydratedTasteProfileSummary.split(tasteGenresMarker)
+      : null;
+  const hydratedTasteProfileText = tasteGenresSplit ? tasteGenresSplit[0].trim() : hydratedTasteProfileSummary;
+  const hydratedTasteProfileGenres = tasteGenresSplit?.[1]
+    ? tasteGenresSplit[1]
+        .split(",")
+        .map((g) => g.trim())
+        .filter(Boolean)
+        .slice(0, 5)
+    : [];
+
   await Promise.all(
     libraryBooks.map(async (b) => {
       if (!b.googleBooksId) return;
@@ -140,10 +215,10 @@ export default async function ProfilePage() {
         <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0 md:max-w-[50%]">
             <h1 className="font-serif text-4xl leading-tight tracking-tight md:text-5xl">
-              Your shelves
+              Your book shelf
             </h1>
             <p className="mt-4 break-words text-base text-[var(--text-secondary)]">
-              Books you saved from recommendations will show the reason they matched your taste.
+              Learn more about your reading preferences and have an overview of your book collection.
             </p>
           </div>
           <div className="flex justify-end md:flex-shrink-0">
@@ -159,11 +234,28 @@ export default async function ProfilePage() {
         <div className="mt-8 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-5">
           <h2 className="font-serif text-2xl leading-tight">Your taste profile</h2>
           {hydratedTasteProfileSummary ? (
-            <p className="mt-3 whitespace-pre-wrap text-base text-[var(--text-secondary)]">
-              {hydratedTasteProfileSummary}
-            </p>
+            <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
+              <p className="min-w-0 whitespace-pre-wrap text-base text-[var(--text-secondary)] md:w-1/2">
+                {hydratedTasteProfileText}
+              </p>
+              <div className="md:w-1/2">
+                {hydratedTasteProfileGenres.length > 0 ? (
+                  <ul className="list-disc space-y-2 pl-6">
+                    {hydratedTasteProfileGenres.map((g) => (
+                      <li key={g} className="text-base text-[var(--brand-burgundy)]">
+                        {g}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-base text-[var(--text-secondary)]">
+                    Genres will appear after you refresh recommendations.
+                  </p>
+                )}
+              </div>
+            </div>
           ) : (
-            <p className="mt-3 whitespace-pre-wrap text-base text-[var(--text-secondary)]">
+            <p className="mt-4 whitespace-pre-wrap text-base text-[var(--text-secondary)]">
               Taste profile text is not available yet. Try generating recommendations again.
             </p>
           )}
@@ -185,26 +277,37 @@ export default async function ProfilePage() {
           <ul className="mt-5 grid gap-3 sm:grid-cols-2">
             {wantToRead.map((b) => (
               <li key={b.userBookId}>
-                <div className="flex items-start justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3 transition-colors hover:border-[var(--brand-blue)]">
+                <div className="relative rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3 transition-colors hover:border-[var(--brand-blue)]">
+                  <RemoveUserBookButton userBookId={b.userBookId} className="absolute right-3 top-3" />
+
                   <Link
                     href={`/book/${b.userBookId}`}
-                    className="flex flex-1 flex-col gap-2 min-w-0"
+                    className="flex min-w-0 items-stretch gap-3 pr-10"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex w-[60%] items-stretch gap-3 min-w-0">
                       {b.thumbnailUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={b.thumbnailUrl}
-                          alt=""
-                          className="h-14 w-10 shrink-0 rounded object-cover"
-                        />
+                        <div className="h-[84px] w-[60px] shrink-0 overflow-hidden rounded">
+                          <img
+                            src={b.thumbnailUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
                       ) : (
-                        <div className="flex h-14 w-10 shrink-0 items-center justify-center rounded bg-[var(--surface)] text-[10px] text-[var(--text-secondary)]">
+                        <div className="flex h-[84px] w-[60px] shrink-0 items-center justify-center rounded bg-[var(--surface)] text-[10px] text-[var(--text-secondary)]">
                           —
                         </div>
                       )}
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-[var(--text-primary)]">{b.title}</p>
+                        <p className="break-words line-clamp-2 text-sm font-medium text-[var(--text-primary)] leading-snug">
+                          {b.title}
+                        </p>
+                        {b.author ? (
+                          <p className="mt-1 line-clamp-1 text-xs text-[var(--brand-burgundy)]">
+                            {formatAuthor(b.author)}
+                          </p>
+                        ) : null}
                         {b.googleBooksId && explanationByGoogleId.has(b.googleBooksId) ? (
                           <p className="mt-1 line-clamp-3 text-xs text-[var(--text-secondary)]">
                             Recommended because: {explanationByGoogleId.get(b.googleBooksId)}
@@ -212,9 +315,10 @@ export default async function ProfilePage() {
                         ) : null}
                       </div>
                     </div>
+                    <div className="w-[40%] flex items-center justify-center">
+                      <ProgressBar ratio={progressRatio(b)} variant="grey" />
+                    </div>
                   </Link>
-
-                  <RemoveUserBookButton userBookId={b.userBookId} />
                 </div>
               </li>
             ))}
@@ -234,26 +338,37 @@ export default async function ProfilePage() {
           <ul className="mt-5 grid gap-3 sm:grid-cols-2">
             {currentlyReading.map((b) => (
               <li key={b.userBookId}>
-                <div className="flex items-start justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3 transition-colors hover:border-[var(--brand-blue)]">
+                <div className="relative rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3 transition-colors hover:border-[var(--brand-blue)]">
+                  <RemoveUserBookButton userBookId={b.userBookId} className="absolute right-3 top-3" />
+
                   <Link
                     href={`/book/${b.userBookId}`}
-                    className="flex flex-1 flex-col gap-2 min-w-0"
+                    className="flex min-w-0 items-stretch gap-3 pr-10"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex w-[60%] items-stretch gap-3 min-w-0">
                       {b.thumbnailUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={b.thumbnailUrl}
-                          alt=""
-                          className="h-14 w-10 shrink-0 rounded object-cover"
-                        />
+                        <div className="h-[84px] w-[60px] shrink-0 overflow-hidden rounded">
+                          <img
+                            src={b.thumbnailUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
                       ) : (
-                        <div className="flex h-14 w-10 shrink-0 items-center justify-center rounded bg-[var(--surface)] text-[10px] text-[var(--text-secondary)]">
+                        <div className="flex h-[84px] w-[60px] shrink-0 items-center justify-center rounded bg-[var(--surface)] text-[10px] text-[var(--text-secondary)]">
                           —
                         </div>
                       )}
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-[var(--text-primary)]">{b.title}</p>
+                        <p className="break-words line-clamp-2 text-sm font-medium text-[var(--text-primary)] leading-snug">
+                          {b.title}
+                        </p>
+                        {b.author ? (
+                          <p className="mt-1 line-clamp-1 text-xs text-[var(--brand-burgundy)]">
+                            {formatAuthor(b.author)}
+                          </p>
+                        ) : null}
                         {b.googleBooksId && explanationByGoogleId.has(b.googleBooksId) ? (
                           <p className="mt-1 line-clamp-3 text-xs text-[var(--text-secondary)]">
                             Recommended because: {explanationByGoogleId.get(b.googleBooksId)}
@@ -261,9 +376,10 @@ export default async function ProfilePage() {
                         ) : null}
                       </div>
                     </div>
+                    <div className="w-[40%] flex items-center justify-center">
+                      <ProgressBar ratio={progressRatio(b)} variant="primary" />
+                    </div>
                   </Link>
-
-                  <RemoveUserBookButton userBookId={b.userBookId} />
                 </div>
               </li>
             ))}
@@ -283,33 +399,49 @@ export default async function ProfilePage() {
           <ul className="mt-5 grid gap-3 sm:grid-cols-2">
             {finished.map((b) => (
               <li key={b.userBookId}>
-                <Link
-                  href={`/book/${b.userBookId}`}
-                  className="flex flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3 transition-colors hover:border-[var(--brand-blue)]"
-                >
-                  <div className="flex items-center gap-3">
-                    {b.thumbnailUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={b.thumbnailUrl}
-                        alt=""
-                        className="h-14 w-10 shrink-0 rounded object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-14 w-10 shrink-0 items-center justify-center rounded bg-[var(--surface)] text-[10px] text-[var(--text-secondary)]">
-                        —
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-[var(--text-primary)]">{b.title}</p>
-                      {b.googleBooksId && explanationByGoogleId.has(b.googleBooksId) ? (
-                        <p className="mt-1 line-clamp-3 text-xs text-[var(--text-secondary)]">
-                          Recommended because: {explanationByGoogleId.get(b.googleBooksId)}
+                <div className="relative rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3 transition-colors hover:border-[var(--brand-blue)]">
+                  <RemoveUserBookButton userBookId={b.userBookId} className="absolute right-3 top-3" />
+
+                  <Link
+                    href={`/book/${b.userBookId}`}
+                    className="flex min-w-0 items-stretch gap-3 pr-10"
+                  >
+                    <div className="flex w-[60%] items-stretch gap-3 min-w-0">
+                      {b.thumbnailUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <div className="h-[84px] w-[60px] shrink-0 overflow-hidden rounded">
+                          <img
+                            src={b.thumbnailUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-[84px] w-[60px] shrink-0 items-center justify-center rounded bg-[var(--surface)] text-[10px] text-[var(--text-secondary)]">
+                          —
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="break-words line-clamp-2 text-sm font-medium text-[var(--text-primary)] leading-snug">
+                          {b.title}
                         </p>
-                      ) : null}
+                        {b.author ? (
+                          <p className="mt-1 line-clamp-1 text-xs text-[var(--brand-burgundy)]">
+                            {formatAuthor(b.author)}
+                          </p>
+                        ) : null}
+                        {b.googleBooksId && explanationByGoogleId.has(b.googleBooksId) ? (
+                          <p className="mt-1 line-clamp-3 text-xs text-[var(--text-secondary)]">
+                            Recommended because: {explanationByGoogleId.get(b.googleBooksId)}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </Link>
+                    <div className="w-[40%] flex items-center justify-center">
+                      <ProgressBar ratio={progressRatio(b)} variant="primary" />
+                    </div>
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>

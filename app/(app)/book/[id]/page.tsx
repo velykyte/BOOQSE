@@ -22,6 +22,25 @@ function formatAuthors(author: unknown): string {
   return "";
 }
 
+function ProgressBar({
+  ratio,
+  variant,
+}: {
+  ratio: number;
+  variant: "grey" | "primary";
+}) {
+  const percent = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+  const fillBg =
+    variant === "grey" ? "bg-[var(--text-secondary)]" : "bg-[var(--brand-burgundy)]";
+  return (
+    <div className="flex w-full items-center justify-center">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
+        <div className={`h-full ${fillBg}`} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export default async function BookDetailPage({ params }: BookPageProps) {
   const { id } = await params;
   const auth = await requireInstantUser();
@@ -45,7 +64,25 @@ export default async function BookDetailPage({ params }: BookPageProps) {
           return [];
         }
       })();
-  const totalTimeMinutes = sessions.reduce((acc, s) => acc + (typeof s.timeMinutes === "number" ? s.timeMinutes : 0), 0);
+  const totalTimeMinutes = sessions.reduce(
+    (acc, s) => acc + (typeof s.timeMinutes === "number" ? s.timeMinutes : 0),
+    0,
+  );
+  const totalPagesRead = sessions.reduce(
+    (acc, s) => acc + (typeof s.pagesRead === "number" ? s.pagesRead : 0),
+    0,
+  );
+
+  function progressRatio(): number {
+    if (detail.isPastBook || detail.status === "finished") return 1;
+    if (detail.status === "want_to_read") return 0;
+    if (detail.status === "currently_reading") {
+      const total = detail.userDefinedTotalPages;
+      if (!Number.isFinite(total) || !total || total <= 0) return 0;
+      return Math.max(0, Math.min(1, totalPagesRead / total));
+    }
+    return 0;
+  }
   const reflections = detail.isPastBook
     ? []
     : await (async () => {
@@ -71,12 +108,12 @@ export default async function BookDetailPage({ params }: BookPageProps) {
           <img
             src={detail.book.thumbnailUrl}
             alt=""
-            className="h-40 w-[107px] shrink-0 rounded-md border border-[var(--border-subtle)] object-cover"
-            width={107}
-            height={160}
+            className="h-60 w-[161px] shrink-0 rounded-md border border-[var(--border-subtle)] object-cover"
+            width={161}
+            height={240}
           />
         ) : (
-          <div className="flex h-40 w-[107px] shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-xs text-[var(--text-secondary)]">
+          <div className="flex h-60 w-[161px] shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-xs text-[var(--text-secondary)]">
             No cover
           </div>
         )}
@@ -93,6 +130,14 @@ export default async function BookDetailPage({ params }: BookPageProps) {
               Total pages for tracking: {detail.userDefinedTotalPages}
             </p>
           ) : null}
+
+          <div className="mt-4">
+            <ProgressBar
+              ratio={progressRatio()}
+              variant={detail.status === "want_to_read" ? "grey" : "primary"}
+            />
+          </div>
+
           {(detail.isPastBook || detail.status === "finished") && detail.rating != null ? (
             <p className="mt-4 text-sm text-[var(--text-secondary)]">Your rating: {detail.rating}/10</p>
           ) : null}
@@ -128,7 +173,7 @@ export default async function BookDetailPage({ params }: BookPageProps) {
         <div className="flex flex-col gap-8 md:flex-row md:items-start">
           <ReadingSessions sessions={sessions} userBookId={detail.userBookId} />
 
-          <section className="flex w-full flex-col gap-4 md:w-1/2">
+          <section className="flex w-full flex-col gap-4 md:w-1/2 md:flex-none md:min-w-0">
             <div className="flex items-end justify-between gap-4">
               <h2 className="font-serif text-2xl leading-tight">Reflections</h2>
               {reflections.length > 0 ? (
@@ -185,7 +230,11 @@ export default async function BookDetailPage({ params }: BookPageProps) {
         </div>
       )}
 
-      {detail.canLogSessions ? <FinishBookForm userBookId={detail.userBookId} /> : null}
+      {detail.canLogSessions ? (
+        <div className="w-full md:w-1/2">
+          <FinishBookForm userBookId={detail.userBookId} />
+        </div>
+      ) : null}
 
       {detail.canLogSessions ? (
         <Link

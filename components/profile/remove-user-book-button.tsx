@@ -4,13 +4,19 @@ import { deleteUserBook, type DeleteUserBookResult } from "@/app/actions/books";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-export function RemoveUserBookButton({ userBookId }: { userBookId: string }) {
+export function RemoveUserBookButton({
+  userBookId,
+  className,
+}: {
+  userBookId: string;
+  className?: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <div className="relative z-30 flex flex-col items-end gap-2">
+    <div className={["z-30", className].filter(Boolean).join(" ")}>
       <button
         type="button"
         disabled={pending}
@@ -36,11 +42,14 @@ export function RemoveUserBookButton({ userBookId }: { userBookId: string }) {
             }
           });
         }}
-        className="relative z-50 inline-flex h-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--text-primary)] transition-colors hover:bg-[var(--surface)] disabled:opacity-50"
+        aria-label="Remove"
+        className="relative z-50 inline-flex h-8 w-8 items-center justify-center rounded-md bg-transparent text-base leading-none text-[var(--text-secondary)] transition-colors hover:text-[var(--brand-burgundy)] disabled:opacity-50 focus:outline-none"
       >
-        Remove
+        ×
       </button>
-      {error ? <p className="max-w-[180px] text-right text-[11px] text-[var(--error)]">{error}</p> : null}
+      {error ? (
+        <p className="mt-1 max-w-[140px] text-right text-[11px] text-[var(--error)]">{error}</p>
+      ) : null}
     </div>
   );
 }

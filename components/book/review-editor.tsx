@@ -107,7 +107,7 @@ export function ReviewEditor({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Write a short review (what you learned or felt)."
-            className="min-h-20 w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+            className="min-h-20 w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-sm outline-none"
           />
           <div className="flex items-center justify-between gap-3">
             {error ? <p className="text-sm text-[var(--error)]">{error}</p> : <span />}

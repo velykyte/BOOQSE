@@ -39,6 +39,7 @@ export function ReflectionFlow({
   };
 
   const submit = () => {
+    const answersToSave = answers;
     setError(null);
     startTransition(async () => {
       const result: SaveReflectionResult = await saveReflection({
@@ -49,6 +50,29 @@ export function ReflectionFlow({
         question3: answers[2],
         question4: answers[3],
         question5: answers[4],
+      });
+      if (result.ok) {
+        router.push(`/book/${result.userBookId}`);
+      } else {
+        setError(result.error);
+      }
+    });
+  };
+
+  const skipAllQuestions = () => {
+    // Reflection answers are optional, so skipping means saving nulls.
+    // (The schema transforms empty strings into `null`.)
+    const skippedAnswers = ["", "", "", "", ""];
+    setError(null);
+    startTransition(async () => {
+      const result: SaveReflectionResult = await saveReflection({
+        sessionId,
+        userBookId,
+        question1: skippedAnswers[0],
+        question2: skippedAnswers[1],
+        question3: skippedAnswers[2],
+        question4: skippedAnswers[3],
+        question5: skippedAnswers[4],
       });
       if (result.ok) {
         router.push(`/book/${result.userBookId}`);
@@ -76,7 +100,7 @@ export function ReflectionFlow({
           value={answers[step]}
           onChange={(e) => setCurrent(e.target.value)}
           rows={6}
-          className="mt-4 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          className="mt-4 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 text-base outline-none"
           placeholder="Write your reflection (optional)"
         />
       </div>
@@ -91,6 +115,14 @@ export function ReflectionFlow({
           className="inline-flex h-11 items-center justify-center rounded-lg border border-[var(--border-subtle)] px-5 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--brand-burgundy)] hover:text-[var(--brand-burgundy)] disabled:opacity-50"
         >
           Back
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={skipAllQuestions}
+          className="inline-flex h-11 items-center justify-center rounded-lg bg-[var(--brand-blue)] px-5 text-sm text-white transition-colors hover:bg-[var(--brand-blue-hover)] disabled:opacity-50"
+        >
+          Skip all
         </button>
         {!isLast ? (
           <button

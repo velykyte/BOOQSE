@@ -34,7 +34,7 @@ export function FinishBookForm({ userBookId }: { userBookId: string }) {
   };
 
   return (
-    <section className="flex max-w-md flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+    <section className="flex w-full flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
       <h3 className="text-sm font-medium text-[var(--text-primary)]">Mark as finished</h3>
       <p className="text-xs text-[var(--text-secondary)]">Set your rating now. You can edit it later.</p>
       <div className="flex items-end gap-3">
@@ -50,7 +50,7 @@ export function FinishBookForm({ userBookId }: { userBookId: string }) {
             max={10}
             value={rating}
             onChange={(e) => setRating(e.target.value)}
-            className="w-28 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-base outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+            className="w-28 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-base outline-none"
           />
         </div>
         <button
@@ -72,7 +72,7 @@ export function FinishBookForm({ userBookId }: { userBookId: string }) {
           value={reviewText}
           onChange={(e) => setReviewText(e.target.value)}
           placeholder="What did you learn or feel?"
-          className="min-h-20 resize-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+          className="min-h-20 resize-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-sm outline-none"
         />
       </div>
       {error ? <p className="text-sm text-[var(--error)]">{error}</p> : null}

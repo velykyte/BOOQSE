@@ -15,6 +15,12 @@ export type StatsDailyPoint = {
 
 export type StatsPageView = {
   streakDays: number;
+  streakCalendarDays: Array<{
+    ymd: string;
+    day: number; // 1-31 (UTC)
+    weekdayLetter: string; // e.g. "M", "T", ...
+    isRead: boolean;
+  }>;
   pagesPerDay: StatsDailyPoint[];
   timePerDay: StatsDailyPoint[];
   avgSpeedPerDay: StatsDailyPoint[];
@@ -89,7 +95,7 @@ export async function getStatsPageView(userId: string): Promise<StatsPageView> {
 
   const allYmds = Object.keys(daily).sort();
   if (allYmds.length === 0) {
-    return { streakDays: 0, pagesPerDay: [], timePerDay: [], avgSpeedPerDay: [] };
+    return { streakDays: 0, streakCalendarDays: [], pagesPerDay: [], timePerDay: [], avgSpeedPerDay: [] };
   }
 
   // Current streak: consecutive reading days ending at the most recent reading day.
@@ -105,6 +111,22 @@ export async function getStatsPageView(userId: string): Promise<StatsPageView> {
 
   // For charts, show the last 14 points to keep the UI minimal.
   const ymdsForChart = allYmds.slice(Math.max(0, allYmds.length - 14));
+
+  // Mini 1-line calendar for the streak bar:
+  // show the last 7 calendar days ending at the most recent reading day,
+  // highlighting days that have reading sessions in blue.
+  const endDate = ymdToDate(allYmds[allYmds.length - 1]) ?? null;
+  const streakCalendarDays = endDate
+    ? Array.from({ length: 7 }).map((_, idx) => {
+        const d = new Date(endDate.getTime() - (6 - idx) * 24 * 60 * 60 * 1000);
+        const ymd = d.toISOString().slice(0, 10);
+        const day = d.getUTCDate();
+        // UTC day letters: Sun, Mon, Tue, Wed, Thu, Fri, Sat.
+        const weekdayLetters = ["S", "M", "T", "W", "T", "F", "S"];
+        const weekdayLetter = weekdayLetters[d.getUTCDay()] ?? "";
+        return { ymd, day, weekdayLetter, isRead: readingDaySet.has(ymd) };
+      })
+    : [];
 
   const pagesPerDay: StatsDailyPoint[] = ymdsForChart.map((ymd) => ({
     ymd,
@@ -129,6 +151,6 @@ export async function getStatsPageView(userId: string): Promise<StatsPageView> {
     };
   });
 
-  return { streakDays, pagesPerDay, timePerDay, avgSpeedPerDay };
+  return { streakDays, streakCalendarDays, pagesPerDay, timePerDay, avgSpeedPerDay };
 }
 

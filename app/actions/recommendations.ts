@@ -21,6 +21,9 @@ export async function generateRecommendations(): Promise<GenerateRecommendations
     if (message === "NOT_ALLOWED") {
       return { ok: false, error: "You can only generate recommendations after rating at least 3 books." };
     }
+    if (message === "DAILY_LIMIT_REACHED") {
+      return { ok: false, error: "You reached your daily recommendations limit. Try again tomorrow." };
+    }
     if (message === "Missing OPENAI_API_KEY.") {
       return { ok: false, error: "Recommendations are unavailable: OPENAI_API_KEY is not set." };
     }

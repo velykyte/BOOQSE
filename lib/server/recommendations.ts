@@ -33,8 +33,14 @@ function extractFirstJsonObject(text: string): unknown {
   }
 }
 
-const recommendationOutputSchema = z.object({
+const tasteProfileOutputSchema = z.object({
   taste_profile_summary: z.string().min(1).max(2000),
+  taste_profile_genres: z
+    .array(z.string().min(1).max(40))
+    .length(5),
+});
+
+const recommendationsOutputSchema = z.object({
   recommendations: z
     .array(
       z.object({
@@ -82,15 +88,29 @@ async function getUserRatedBooks(userId: string): Promise<RatedBookInput[]> {
   const rows = Array.isArray(result.user_books) ? result.user_books : [];
   const out: RatedBookInput[] = [];
 
+  const toIsPastBook = (value: unknown): boolean => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const v = value.trim().toLowerCase();
+      if (v === "true" || v === "1" || v === "yes") return true;
+      if (v === "false" || v === "0" || v === "no" || v === "") return false;
+      return Boolean(v);
+    }
+    if (typeof value === "number") return value === 1;
+    return Boolean(value);
+  };
+
   for (const r of rows) {
     if (!r || typeof r !== "object") continue;
     const row = r as Record<string, InstantValue>;
     const rating = typeof row.rating === "number" ? row.rating : null;
     const status = typeof row.status === "string" ? row.status : null;
+    const isPastBook = toIsPastBook(row.is_past_book);
     const title = typeof row.book_title === "string" ? row.book_title : "Untitled";
 
     if (rating == null) continue;
-    if (status !== "finished") continue;
+    // Taste profile should include past books as long as they're rated.
+    if (status !== "finished" && !isPastBook) continue;
 
     const authors = typeof row.book_authors === "string" ? row.book_authors : null;
     // We store book_authors as either array-ish or CSV depending on schema drift;
@@ -306,7 +326,7 @@ export async function getRecommendationsPageView(userId: string): Promise<Recomm
   const ratedBooks = await getUserRatedBooks(userId);
   const ratedBooksCount = ratedBooks.length;
   const used = await getUserRefreshCountsToday(userId);
-  const refreshRemaining = Math.max(0, 3 - used);
+  const refreshRemaining = Math.max(0, 6 - used);
 
   const latest = await getLatestRecommendationsForUser(userId);
   return {
@@ -328,7 +348,7 @@ export async function generateRecommendationsForUser(userId: string): Promise<vo
   if (ratedBooksCount < 3) throw new Error("NOT_ALLOWED");
 
   const used = await getUserRefreshCountsToday(userId);
-  if (used >= 3) throw new Error("NOT_ALLOWED");
+  if (used >= 6) throw new Error("DAILY_LIMIT_REACHED");
 
   const libraryBooks = await listLibraryBooksForUser(userId);
   const ownedGoogleBooksIds = new Set(
@@ -364,20 +384,24 @@ export async function generateRecommendationsForUser(userId: string): Promise<vo
     });
   }
 
-  const prompt = [
-    "You are helping a user choose books that match their current taste.",
-    "Inputs (rated books with private reflections and public reviews) are below. Use them to infer themes, tone, and preferences.",
-    "Return exactly 3 distinct recommendations, each with a short explanation.",
-    "The searchQuery should be a good Google Books search string for that title.",
+  const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
+
+  // 1) Taste profile must be based ONLY on the user's rated books (rating + review + reflections).
+  // We do this in a separate call so the model can’t “bleed” info from the recommendation outputs.
+  const tastePrompt = [
+    "You are generating a reading taste profile for a user.",
+    "Use ONLY the rated books data below to infer recurring preferences (tone, themes, pacing, what they liked/disliked).",
+    "Inputs are below and include: rating, public review text, and private reflection answers.",
+    "Summarize in 2-4 sentences.",
+    "Also extract exactly 5 book genre labels that best match the summary (broad genres are fine).",
     "",
     "Output JSON schema:",
-    '{ "taste_profile_summary": string, "recommendations": [ { "title": string, "author": string, "explanation": string, "searchQuery": string } x3 ] }',
+    '{ "taste_profile_summary": string, "taste_profile_genres": string[] }',
     "",
     `User rated books (JSON): ${JSON.stringify(booksForPrompt)}`,
   ].join("\n");
 
-  const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const tasteRes = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${openaiKey}`,
@@ -389,34 +413,90 @@ export async function generateRecommendationsForUser(userId: string): Promise<vo
       messages: [
         {
           role: "system",
-          content:
-            "Return JSON only. No Markdown. Do not include any extra keys.",
+          content: "Return JSON only. No Markdown. Do not include any extra keys.",
         },
-        { role: "user", content: prompt },
+        { role: "user", content: tastePrompt },
+      ],
+      max_tokens: 600,
+    }),
+  });
+
+  if (!tasteRes.ok) {
+    const txt = await tasteRes.text().catch(() => "");
+    throw new Error(`OpenAI request failed (${tasteRes.status} ${tasteRes.statusText}). ${txt}`);
+  }
+
+  const tasteBody = (await tasteRes.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const tasteContent = tasteBody.choices?.[0]?.message?.content;
+  if (!tasteContent) throw new Error("OpenAI returned empty taste profile content.");
+
+  const tasteExtracted = extractFirstJsonObject(tasteContent);
+  const tasteParsed = tasteProfileOutputSchema.safeParse(tasteExtracted);
+  if (!tasteParsed.success) {
+    throw new Error("OpenAI returned invalid taste profile output.");
+  }
+
+  const tasteSummary = tasteParsed.data.taste_profile_summary;
+  const tasteGenres = tasteParsed.data.taste_profile_genres;
+  const genresPart = `\n\nGenres: ${tasteGenres.join(", ")}`;
+  // Keep stored value within our expected field size to avoid UI overflow.
+  const maxStoredLen = 2000;
+  const allowedSummaryLen = Math.max(0, maxStoredLen - genresPart.length);
+  const storedTasteSummary = `${tasteSummary.slice(0, allowedSummaryLen)}${genresPart}`;
+
+  // 2) Recommendations are also based on the same rated books inputs, but separate from taste profile.
+  const recommendationsPrompt = [
+    "You are helping a user choose books that match their current taste.",
+    "Inputs (rated books with private reflections and public reviews) are below. Use them to infer themes, tone, and preferences.",
+    "Return exactly 3 distinct recommendations, each with a short explanation.",
+    "The searchQuery should be a good Google Books search string for that title.",
+    "",
+    "Output JSON schema:",
+    '{ "recommendations": [ { "title": string, "author": string, "explanation": string, "searchQuery": string } x3 ] }',
+    "",
+    `User rated books (JSON): ${JSON.stringify(booksForPrompt)}`,
+  ].join("\n");
+
+  const recRes = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openaiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.7,
+      messages: [
+        {
+          role: "system",
+          content: "Return JSON only. No Markdown. Do not include any extra keys.",
+        },
+        { role: "user", content: recommendationsPrompt },
       ],
       max_tokens: 900,
     }),
   });
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`OpenAI request failed (${res.status} ${res.statusText}). ${txt}`);
+  if (!recRes.ok) {
+    const txt = await recRes.text().catch(() => "");
+    throw new Error(`OpenAI request failed (${recRes.status} ${recRes.statusText}). ${txt}`);
   }
 
-  const body = (await res.json()) as {
+  const recBody = (await recRes.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
   };
-  const content = body.choices?.[0]?.message?.content;
-  if (!content) throw new Error("OpenAI returned empty content.");
+  const recContent = recBody.choices?.[0]?.message?.content;
+  if (!recContent) throw new Error("OpenAI returned empty recommendations content.");
 
-  const extracted = extractFirstJsonObject(content);
-  const parsed = recommendationOutputSchema.safeParse(extracted);
-  if (!parsed.success) {
-    throw new Error("OpenAI returned invalid output.");
+  const recExtracted = extractFirstJsonObject(recContent);
+  const recParsed = recommendationsOutputSchema.safeParse(recExtracted);
+  if (!recParsed.success) {
+    throw new Error("OpenAI returned invalid recommendations output.");
   }
 
-  const tasteSummary = parsed.data.taste_profile_summary;
-  const openaiRecommendations = parsed.data.recommendations;
+  const openaiRecommendations = recParsed.data.recommendations;
 
   // Enrich recommendations using Google Books so we can render covers and support actions.
   const recommendedItems: Array<{
@@ -481,7 +561,7 @@ export async function generateRecommendationsForUser(userId: string): Promise<vo
         generated_at: now,
         created_at: now,
         owner_user_id: userId,
-        taste_profile_summary: tasteSummary,
+        taste_profile_summary: storedTasteSummary,
       } as any),
     ...recommendedItems.map((it) => {
       const itemId = id();
@@ -508,7 +588,7 @@ export async function generateRecommendationsForUser(userId: string): Promise<vo
   try {
     await db.transact(
       (db.tx.users[userId] as any).update({
-        taste_profile_summary: tasteSummary,
+        taste_profile_summary: storedTasteSummary,
         taste_profile_updated_at: now,
       } as any),
     );

@@ -110,7 +110,7 @@ export function ReadingSessions({
   };
 
   return (
-    <section className="flex w-full flex-col gap-4 md:w-1/2">
+    <section className="flex w-full flex-col gap-4 md:w-1/2 md:flex-none md:min-w-0">
       <div className="flex items-end justify-between gap-4">
         <h2 className="font-serif text-2xl leading-tight">Sessions</h2>
         {sessions.length > 0 ? (
@@ -151,7 +151,7 @@ export function ReadingSessions({
                           max={SESSION_LIMITS.pagesReadMax}
                           value={pagesRead}
                           onChange={(e) => setPagesRead(e.target.value)}
-                          className="w-36 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-base outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+                          className="w-36 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-base outline-none"
                         />
                       </div>
 
@@ -169,7 +169,7 @@ export function ReadingSessions({
                           max={SESSION_LIMITS.timeMinutesMax}
                           value={timeMinutes}
                           onChange={(e) => setTimeMinutes(e.target.value)}
-                          className="w-36 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-base outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+                          className="w-36 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-base outline-none"
                         />
                       </div>
                     </div>
@@ -205,6 +205,16 @@ export function ReadingSessions({
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => {
+                            router.push(`/reflect?sessionId=${s.sessionId}&userBookId=${userBookId}`);
+                          }}
+                          className="text-sm text-[var(--brand-blue)] underline-offset-2 hover:underline disabled:opacity-50"
+                        >
+                          Add reflection
+                        </button>
                         <button
                           type="button"
                           disabled={pending}

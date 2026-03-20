@@ -160,7 +160,7 @@ export function AddBookFlow({ intent }: { intent: Intent }) {
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder="Title or author"
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-4 py-3 text-base outline-none ring-[var(--brand-burgundy)] focus:ring-2"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-4 py-3 text-base outline-none"
             autoComplete="off"
           />
           <p className="text-xs text-[var(--text-secondary)]">Results from Google Books.</p>
@@ -181,12 +181,12 @@ export function AddBookFlow({ intent }: { intent: Intent }) {
                     <img
                       src={item.thumbnailUrl}
                       alt=""
-                      className="h-20 w-14 shrink-0 rounded object-cover"
-                      width={56}
-                      height={80}
+                      className="h-[120px] w-[84px] shrink-0 rounded object-cover"
+                      width={84}
+                      height={120}
                     />
                   ) : (
-                    <div className="flex h-20 w-14 shrink-0 items-center justify-center rounded bg-[var(--surface-subtle)] text-[10px] text-[var(--text-secondary)]">
+                    <div className="flex h-[120px] w-[84px] shrink-0 items-center justify-center rounded bg-[var(--surface-subtle)] text-[10px] text-[var(--text-secondary)]">
                       —
                     </div>
                   )}
@@ -209,9 +209,9 @@ export function AddBookFlow({ intent }: { intent: Intent }) {
               <img
                 src={selected.thumbnailUrl}
                 alt=""
-                className="h-28 w-[75px] shrink-0 rounded object-cover"
-                width={75}
-                height={112}
+                className="h-[168px] w-[113px] shrink-0 rounded object-cover"
+                width={113}
+                height={168}
               />
             ) : null}
             <div>
@@ -249,7 +249,7 @@ export function AddBookFlow({ intent }: { intent: Intent }) {
                 inputMode="numeric"
                 value={totalPages}
                 onChange={(e) => setTotalPages(e.target.value)}
-                className="max-w-xs rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+                className="max-w-xs rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 text-base outline-none"
                 placeholder="e.g. 320"
               />
             </div>
@@ -266,7 +266,7 @@ export function AddBookFlow({ intent }: { intent: Intent }) {
                 inputMode="numeric"
                 value={rating}
                 onChange={(e) => setRating(e.target.value)}
-                className="max-w-xs rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[var(--brand-blue)]"
+                className="max-w-xs rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-4 py-3 text-base outline-none"
               />
             </div>
           )}

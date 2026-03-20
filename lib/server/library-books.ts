@@ -21,11 +21,13 @@ function toIsPastBook(value: unknown): boolean {
 export type LibraryBookItem = {
   userBookId: string;
   title: string;
+  author: string | null;
   thumbnailUrl: string | null;
   status: string;
   isPastBook: boolean;
   createdAt: string | null;
   googleBooksId: string | null;
+  userDefinedTotalPages: number | null;
 };
 
 export async function listLibraryBooksForUser(userId: string): Promise<LibraryBookItem[]> {
@@ -48,7 +50,9 @@ export async function listLibraryBooksForUser(userId: string): Promise<LibraryBo
       user?: unknown;
       status?: string;
       is_past_book?: boolean;
+      user_defined_total_pages?: number | string | null;
       book_title?: string;
+      book_authors?: unknown;
       book_thumbnail_url?: string | null;
       created_at?: string | Date;
       book?: unknown;
@@ -60,7 +64,7 @@ export async function listLibraryBooksForUser(userId: string): Promise<LibraryBo
     if (ownerField !== userId && linkedUserId !== userId) continue;
 
     const linkedBook = first(ub.book as any) as
-      | { title?: string; thumbnail_url?: string | null }
+      | { title?: string; author?: unknown; thumbnail_url?: string | null }
       | undefined;
 
     const googleBooksId =
@@ -74,6 +78,30 @@ export async function listLibraryBooksForUser(userId: string): Promise<LibraryBo
       (typeof linkedBook?.title === "string" && linkedBook.title) ||
       (typeof ub.book_title === "string" && ub.book_title) ||
       "Untitled";
+
+    const author = (() => {
+      // Prefer `user_books.book_authors` (written during add-book),
+      // but fall back to canonical `books.author` if needed.
+      const v = (ub as any)?.book_authors ?? (linkedBook as any)?.author;
+      if (v == null) return null;
+      if (typeof v === "string") {
+        const t = v.trim();
+        return t.length ? t : null;
+      }
+      if (Array.isArray(v)) {
+        const parts = v.filter((x) => typeof x === "string" && x.trim().length > 0) as string[];
+        return parts.length ? parts.map((p) => p.trim()).join(", ") : null;
+      }
+      // Handle JSON objects that come back from InstantDB with numeric keys (array-ish objects).
+      if (typeof v === "object") {
+        const keys = Object.keys(v).filter((k) => /^\d+$/.test(k)).sort((a, b) => Number(a) - Number(b));
+        const parts = keys
+          .map((k) => (v as any)[k])
+          .filter((x) => typeof x === "string" && x.trim().length > 0) as string[];
+        return parts.length ? parts.map((p) => p.trim()).join(", ") : null;
+      }
+      return null;
+    })();
     const thumbnailUrl =
       (typeof linkedBook?.thumbnail_url === "string" && linkedBook.thumbnail_url) ||
       (typeof ub.book_thumbnail_url === "string" ? ub.book_thumbnail_url : null);
@@ -81,6 +109,7 @@ export async function listLibraryBooksForUser(userId: string): Promise<LibraryBo
     out.push({
       userBookId: ub.id,
       title,
+      author,
       thumbnailUrl,
       status: typeof ub.status === "string" ? ub.status : "",
       isPastBook: toIsPastBook(ub.is_past_book),
@@ -91,6 +120,17 @@ export async function listLibraryBooksForUser(userId: string): Promise<LibraryBo
             ? ub.created_at.toISOString()
             : null,
       googleBooksId,
+      userDefinedTotalPages: (() => {
+        if (typeof (ub as any).user_defined_total_pages === "number") {
+          const v = (ub as any).user_defined_total_pages;
+          return Number.isFinite(v) ? v : null;
+        }
+        if (typeof (ub as any).user_defined_total_pages === "string") {
+          const parsed = Number.parseInt((ub as any).user_defined_total_pages, 10);
+          return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+      })(),
     });
   }
 
