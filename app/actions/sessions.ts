@@ -30,6 +30,21 @@ export async function logReadingSession(input: unknown): Promise<LogSessionResul
 
   try {
     const { sessionId } = await insertReadingSession(auth.user.id, tz, parsed.data);
+
+    // Completing the first logged session should unlock the rest of the app.
+    const db = getInstantAdminDb();
+    const now = new Date();
+    try {
+      await db.transact(
+        db.tx.users[auth.user.id].update({
+          onboarding_completed: true,
+          updated_at: now,
+        }),
+      );
+    } catch (e) {
+      console.error("[logReadingSession] failed to mark onboarding complete", e);
+    }
+
     return { ok: true, userBookId: parsed.data.userBookId, sessionId };
   } catch (e) {
     const code = e instanceof Error ? e.message : "";

@@ -75,6 +75,22 @@ export async function addPastFinishedBook(input: unknown): Promise<AddBookAction
 
   try {
     const { userBookId } = await insertPastUserBook(auth.user.id, parsed.data);
+
+    // If the initial onboarding update failed (e.g. transient InstantDB outage),
+    // ensure the user is unblocked after successfully rating their first book.
+    const db = getInstantAdminDb();
+    const now = new Date();
+    try {
+      await db.transact(
+        db.tx.users[auth.user.id].update({
+          onboarding_completed: true,
+          updated_at: now,
+        }),
+      );
+    } catch (e) {
+      console.error("[addPastFinishedBook] failed to mark onboarding complete", e);
+    }
+
     return { ok: true, userBookId };
   } catch (e) {
     console.error("[addPastFinishedBook] failed", {

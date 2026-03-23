@@ -3,7 +3,15 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-const ALLOWED_WHEN_INCOMPLETE = ["/onboarding", "/add-book", "/log-session"];
+// While a user is onboarding, they need to be able to complete the onboarding journey
+// (add a book -> land on book detail -> log session -> reflect).
+const ALLOWED_WHEN_INCOMPLETE = [
+  "/onboarding",
+  "/add-book",
+  "/log-session",
+  "/book",
+  "/reflect",
+];
 
 export function OnboardingGate({
   onboardingCompleted,
