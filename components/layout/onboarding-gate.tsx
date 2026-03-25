@@ -11,6 +11,10 @@ const ALLOWED_WHEN_INCOMPLETE = [
   "/log-session",
   "/book",
   "/reflect",
+  "/",
+  "/profile",
+  "/stats",
+  "/recommendations",
 ];
 
 export function OnboardingGate({
