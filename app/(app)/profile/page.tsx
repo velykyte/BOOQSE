@@ -286,8 +286,8 @@ export default async function ProfilePage() {
                   >
                     <div className="flex w-[60%] items-stretch gap-3 min-w-0">
                       {b.thumbnailUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <div className="h-[84px] w-[60px] shrink-0 overflow-hidden rounded">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={b.thumbnailUrl}
                             alt=""
@@ -347,8 +347,8 @@ export default async function ProfilePage() {
                   >
                     <div className="flex w-[60%] items-stretch gap-3 min-w-0">
                       {b.thumbnailUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <div className="h-[84px] w-[60px] shrink-0 overflow-hidden rounded">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={b.thumbnailUrl}
                             alt=""
@@ -408,8 +408,8 @@ export default async function ProfilePage() {
                   >
                     <div className="flex w-[60%] items-stretch gap-3 min-w-0">
                       {b.thumbnailUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <div className="h-[84px] w-[60px] shrink-0 overflow-hidden rounded">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={b.thumbnailUrl}
                             alt=""

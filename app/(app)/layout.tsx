@@ -5,9 +5,13 @@ import { authOptions } from "@/auth";
 import { countActiveCurrentBooks } from "@/lib/server/current-reading";
 import { getAppUserByEmail } from "@/lib/server/get-app-user";
 import { getServerSession } from "next-auth";
-import { unstable_cache as cache } from "next/cache";
+import { unstable_cache as cache, unstable_noStore as noStore } from "next/cache";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // Ensure `onboardingCompleted` is always computed from the latest InstantDB state.
+  // Otherwise users can get stuck on `/onboarding` after completing onboarding actions.
+  noStore();
+
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
   let appUser = null as Awaited<ReturnType<typeof getAppUserByEmail>> | null;
